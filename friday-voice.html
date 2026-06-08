@@ -1,0 +1,882 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>F.R.I.D.A.Y — Voice Assistant</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --blue: #00ccff;
+    --blue2: #0066ff;
+    --glow: rgba(0,200,255,0.4);
+    --glow2: rgba(0,100,255,0.3);
+    --bg: #00040e;
+    --panel: rgba(0,15,40,0.7);
+    --border: rgba(0,200,255,0.18);
+    --text: rgba(180,230,255,0.92);
+    --dim: rgba(80,160,210,0.55);
+  }
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  body {
+    background: var(--bg);
+    min-height: 100vh;
+    font-family: 'Rajdhani', sans-serif;
+    color: var(--text);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    position: relative;
+  }
+
+  /* ═══ BACKGROUND ═══ */
+  .bg-wrap {
+    position: fixed; inset: 0; z-index: 0; overflow: hidden;
+  }
+
+  .bg-grid {
+    position: absolute; inset: 0;
+    background-image:
+      linear-gradient(rgba(0,180,255,0.035) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,180,255,0.035) 1px, transparent 1px);
+    background-size: 50px 50px;
+    animation: grid-move 25s linear infinite;
+  }
+
+  @keyframes grid-move {
+    to { background-position: 50px 50px; }
+  }
+
+  .bg-orb1 {
+    position: absolute;
+    width: 900px; height: 900px;
+    bottom: -400px; left: 50%;
+    transform: translateX(-50%);
+    background: radial-gradient(circle, rgba(0,80,200,0.18) 0%, transparent 65%);
+    filter: blur(60px);
+    animation: orb-breathe 6s ease-in-out infinite;
+  }
+
+  .bg-orb2 {
+    position: absolute;
+    width: 400px; height: 400px;
+    top: -100px; right: -100px;
+    background: radial-gradient(circle, rgba(0,40,150,0.12) 0%, transparent 70%);
+    filter: blur(80px);
+    animation: orb-breathe 8s ease-in-out infinite reverse;
+  }
+
+  @keyframes orb-breathe {
+    0%,100% { opacity:0.7; transform: translateX(-50%) scale(1); }
+    50%      { opacity:1;   transform: translateX(-50%) scale(1.1); }
+  }
+
+  .scanline {
+    position: fixed; left:0; right:0; height:1px; z-index:30;
+    background: linear-gradient(90deg, transparent, rgba(0,200,255,0.4), transparent);
+    animation: scan 8s linear infinite;
+  }
+
+  @keyframes scan { from { top:0; } to { top:100vh; } }
+
+  /* corners */
+  .corner {
+    position: fixed; width:50px; height:50px; z-index:5; opacity:0.4;
+  }
+  .c-tl { top:12px; left:12px; border-top:1px solid var(--blue); border-left:1px solid var(--blue); }
+  .c-tr { top:12px; right:12px; border-top:1px solid var(--blue); border-right:1px solid var(--blue); }
+  .c-bl { bottom:12px; left:12px; border-bottom:1px solid var(--blue); border-left:1px solid var(--blue); }
+  .c-br { bottom:12px; right:12px; border-bottom:1px solid var(--blue); border-right:1px solid var(--blue); }
+
+  /* ═══ MAIN CARD ═══ */
+  .card {
+    position: relative; z-index: 10;
+    width: min(480px, 95vw);
+    background: rgba(0,10,30,0.75);
+    border: 1px solid var(--border);
+    border-radius: 24px;
+    backdrop-filter: blur(30px);
+    box-shadow:
+      0 0 0 1px rgba(0,200,255,0.05) inset,
+      0 40px 120px rgba(0,0,0,0.7),
+      0 0 60px rgba(0,100,200,0.12);
+    padding: 32px 28px 28px;
+    display: flex; flex-direction: column; align-items: center; gap: 28px;
+  }
+
+  /* Top bar */
+  .top-bar {
+    width:100%; display:flex; align-items:center; justify-content:space-between;
+  }
+
+  .fri-logo {
+    font-family: 'Orbitron', monospace;
+    font-size: 14px; font-weight: 900;
+    letter-spacing: 4px;
+    color: var(--blue);
+    text-shadow: 0 0 12px var(--glow);
+  }
+
+  .fri-sub {
+    font-size: 9px; letter-spacing: 2.5px;
+    color: var(--dim); text-transform: uppercase;
+  }
+
+  .status-pill {
+    display: flex; align-items: center; gap: 6px;
+    background: rgba(0,200,255,0.06);
+    border: 1px solid rgba(0,200,255,0.15);
+    border-radius: 100px;
+    padding: 5px 12px;
+    font-size: 9px; letter-spacing: 2px;
+    color: var(--dim); text-transform: uppercase;
+  }
+
+  .status-dot {
+    width:6px; height:6px; border-radius:50%;
+    background: #00ff88; box-shadow: 0 0 8px #00ff88;
+    animation: blink 2s ease-in-out infinite;
+  }
+
+  @keyframes blink { 0%,100%{opacity:1;} 50%{opacity:0.2;} }
+
+  /* ═══ ORB VISUALIZER ═══ */
+  .orb-wrap {
+    position: relative;
+    width: 200px; height: 200px;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  /* Outer rings */
+  .ring {
+    position: absolute; border-radius: 50%;
+    border: 1px solid rgba(0,200,255,0.15);
+    animation: ring-rotate linear infinite;
+  }
+
+  .ring-1 { width:200px; height:200px; animation-duration:15s; border-top-color: rgba(0,200,255,0.5); }
+  .ring-2 { width:168px; height:168px; animation-duration:10s; animation-direction:reverse; border-right-color: rgba(0,150,255,0.4); }
+  .ring-3 { width:136px; height:136px; animation-duration:20s; border-bottom-color: rgba(0,100,255,0.3); }
+
+  @keyframes ring-rotate { to { transform: rotate(360deg); } }
+
+  /* Core orb */
+  .orb-core {
+    width: 100px; height: 100px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%,
+      rgba(0,200,255,0.3) 0%,
+      rgba(0,100,200,0.2) 40%,
+      rgba(0,20,80,0.8) 100%
+    );
+    border: 1px solid rgba(0,200,255,0.4);
+    box-shadow:
+      0 0 30px rgba(0,150,255,0.4),
+      0 0 60px rgba(0,80,200,0.2),
+      inset 0 0 20px rgba(0,150,255,0.15);
+    display: flex; align-items: center; justify-content: center;
+    position: relative;
+    transition: all 0.3s ease;
+  }
+
+  .orb-core.listening {
+    box-shadow:
+      0 0 40px rgba(0,255,150,0.5),
+      0 0 80px rgba(0,200,100,0.3),
+      inset 0 0 30px rgba(0,255,150,0.2);
+    border-color: rgba(0,255,150,0.6);
+    background: radial-gradient(circle at 35% 35%,
+      rgba(0,255,150,0.3) 0%,
+      rgba(0,150,100,0.2) 40%,
+      rgba(0,20,40,0.8) 100%
+    );
+    animation: listen-pulse 0.8s ease-in-out infinite;
+  }
+
+  .orb-core.speaking {
+    animation: speak-pulse 0.4s ease-in-out infinite;
+    box-shadow:
+      0 0 40px rgba(0,200,255,0.7),
+      0 0 80px rgba(0,100,255,0.4),
+      inset 0 0 30px rgba(0,200,255,0.3);
+  }
+
+  .orb-core.thinking {
+    animation: think-spin 1s linear infinite;
+    box-shadow:
+      0 0 40px rgba(255,180,0,0.4),
+      0 0 80px rgba(200,100,0,0.2),
+      inset 0 0 20px rgba(255,180,0,0.15);
+    border-color: rgba(255,180,0,0.5);
+  }
+
+  @keyframes listen-pulse {
+    0%,100% { transform: scale(1); }
+    50%      { transform: scale(1.08); }
+  }
+
+  @keyframes speak-pulse {
+    0%,100% { transform: scale(1); box-shadow: 0 0 40px rgba(0,200,255,0.7), 0 0 80px rgba(0,100,255,0.4); }
+    50%      { transform: scale(1.05); box-shadow: 0 0 60px rgba(0,200,255,0.9), 0 0 120px rgba(0,100,255,0.6); }
+  }
+
+  @keyframes think-spin {
+    to { transform: rotate(360deg); }
+  }
+
+  .orb-icon {
+    font-size: 28px;
+    filter: drop-shadow(0 0 8px var(--blue));
+    transition: all 0.3s ease;
+    z-index: 1;
+  }
+
+  /* Sound wave bars (visible when listening) */
+  .wave-bars {
+    position: absolute;
+    bottom: -30px;
+    display: flex; gap: 4px; align-items: flex-end;
+    height: 24px; opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+
+  .wave-bars.active { opacity: 1; }
+
+  .bar {
+    width: 3px; border-radius: 3px;
+    background: linear-gradient(to top, var(--blue2), var(--blue));
+    box-shadow: 0 0 6px var(--glow);
+    animation: wave-dance 0.5s ease-in-out infinite;
+    min-height: 4px;
+  }
+
+  .bar:nth-child(1) { animation-delay: 0s;    animation-duration: 0.45s; }
+  .bar:nth-child(2) { animation-delay: 0.1s;  animation-duration: 0.55s; }
+  .bar:nth-child(3) { animation-delay: 0.05s; animation-duration: 0.4s; }
+  .bar:nth-child(4) { animation-delay: 0.15s; animation-duration: 0.6s; }
+  .bar:nth-child(5) { animation-delay: 0.08s; animation-duration: 0.5s; }
+  .bar:nth-child(6) { animation-delay: 0.2s;  animation-duration: 0.45s; }
+  .bar:nth-child(7) { animation-delay: 0.12s; animation-duration: 0.55s; }
+
+  @keyframes wave-dance {
+    0%,100% { height: 4px; }
+    50%      { height: 22px; }
+  }
+
+  /* ═══ STATUS TEXT ═══ */
+  .state-text {
+    font-family: 'Orbitron', monospace;
+    font-size: 11px; letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--dim);
+    text-align: center;
+    min-height: 18px;
+    transition: all 0.3s ease;
+  }
+
+  .state-text.listening { color: #00ff88; text-shadow: 0 0 10px rgba(0,255,136,0.5); }
+  .state-text.speaking  { color: var(--blue); text-shadow: 0 0 10px var(--glow); }
+  .state-text.thinking  { color: #ffaa00; text-shadow: 0 0 10px rgba(255,170,0,0.5); }
+
+  /* ═══ TRANSCRIPT BOX ═══ */
+  .transcript-wrap {
+    width: 100%;
+    background: rgba(0,10,30,0.5);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 16px;
+    min-height: 90px;
+    max-height: 160px;
+    overflow-y: auto;
+    position: relative;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+
+  .transcript-label {
+    font-size: 8px; letter-spacing: 3px;
+    color: var(--dim); text-transform: uppercase;
+    margin-bottom: 8px;
+    font-family: 'Orbitron', monospace;
+  }
+
+  .transcript-text {
+    font-size: 13px; line-height: 1.7;
+    color: var(--text);
+    white-space: pre-wrap;
+  }
+
+  .transcript-text.user-text { color: rgba(150,220,255,0.8); }
+  .transcript-text.fri-text  {
+    color: rgba(100,200,255,0.95);
+    border-left: 2px solid var(--blue);
+    padding-left: 10px;
+    margin-top: 8px;
+  }
+
+  /* cursor blink */
+  .cursor {
+    display: inline-block;
+    width: 2px; height: 14px;
+    background: var(--blue);
+    margin-left: 2px;
+    animation: cur-blink 0.7s ease-in-out infinite;
+    vertical-align: middle;
+  }
+
+  @keyframes cur-blink { 0%,100%{opacity:1;} 50%{opacity:0;} }
+
+  /* ═══ CONTROLS ═══ */
+  .controls {
+    display: flex; gap: 14px; align-items: center;
+  }
+
+  .mic-btn {
+    width: 72px; height: 72px; border-radius: 50%;
+    background: linear-gradient(135deg, rgba(0,100,220,0.3), rgba(0,40,120,0.5));
+    border: 1.5px solid rgba(0,200,255,0.35);
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 26px;
+    transition: all 0.25s ease;
+    box-shadow: 0 0 20px rgba(0,100,200,0.2);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .mic-btn::before {
+    content: '';
+    position: absolute; inset: -2px;
+    border-radius: 50%;
+    border: 2px solid transparent;
+    background: linear-gradient(135deg, var(--blue), var(--blue2)) border-box;
+    -webkit-mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
+    mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: destination-out;
+    mask-composite: exclude;
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+
+  .mic-btn:hover::before { opacity: 1; }
+
+  .mic-btn:hover {
+    transform: scale(1.07);
+    box-shadow: 0 0 30px rgba(0,150,255,0.4);
+  }
+
+  .mic-btn.active {
+    background: linear-gradient(135deg, rgba(0,200,100,0.3), rgba(0,100,60,0.5));
+    border-color: rgba(0,255,150,0.5);
+    box-shadow: 0 0 30px rgba(0,255,150,0.3);
+    animation: mic-ring 1s ease-in-out infinite;
+  }
+
+  @keyframes mic-ring {
+    0%,100% { box-shadow: 0 0 30px rgba(0,255,150,0.3); }
+    50%      { box-shadow: 0 0 50px rgba(0,255,150,0.6), 0 0 0 8px rgba(0,255,150,0.08); }
+  }
+
+  .side-btn {
+    width: 46px; height: 46px; border-radius: 50%;
+    background: rgba(0,20,60,0.6);
+    border: 1px solid var(--border);
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+    transition: all 0.2s ease;
+  }
+
+  .side-btn:hover {
+    background: rgba(0,50,120,0.4);
+    border-color: rgba(0,200,255,0.4);
+    transform: scale(1.05);
+  }
+
+  /* ═══ HINT ═══ */
+  .hint {
+    font-size: 10px; letter-spacing: 1.5px;
+    color: var(--dim); text-transform: uppercase;
+    text-align: center;
+  }
+
+  /* ═══ VOICE SELECTOR ═══ */
+  .voice-row {
+    width: 100%; display: flex; align-items: center; gap: 10px;
+  }
+
+  .voice-label {
+    font-size: 9px; letter-spacing: 2px;
+    color: var(--dim); text-transform: uppercase;
+    white-space: nowrap;
+    font-family: 'Orbitron', monospace;
+  }
+
+  select {
+    flex: 1;
+    background: rgba(0,15,40,0.7);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 12px; letter-spacing: 0.5px;
+    padding: 6px 10px;
+    outline: none;
+    cursor: pointer;
+  }
+
+  select:focus { border-color: rgba(0,200,255,0.4); }
+
+  /* Speed control */
+  .speed-row {
+    width:100%; display:flex; align-items:center; gap:10px;
+  }
+
+  input[type=range] {
+    flex:1; height:3px;
+    -webkit-appearance:none; appearance:none;
+    background: linear-gradient(90deg, var(--blue2), var(--blue));
+    border-radius:2px; outline:none; cursor:pointer;
+  }
+
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance:none;
+    width:12px; height:12px; border-radius:50%;
+    background:var(--blue);
+    box-shadow: 0 0 8px var(--glow);
+    cursor:pointer;
+  }
+
+  .fade-in { animation: fade-in 0.6s ease forwards; }
+  @keyframes fade-in { from{opacity:0;transform:translateY(10px);} to{opacity:1;transform:translateY(0);} }
+</style>
+</head>
+<body>
+
+<div class="bg-wrap">
+  <div class="bg-grid"></div>
+  <div class="bg-orb1"></div>
+  <div class="bg-orb2"></div>
+</div>
+
+<div class="scanline"></div>
+<div class="corner c-tl"></div>
+<div class="corner c-tr"></div>
+<div class="corner c-bl"></div>
+<div class="corner c-br"></div>
+
+<!-- MAIN CARD -->
+<div class="card fade-in">
+
+  <!-- Top bar -->
+  <div class="top-bar">
+    <div>
+      <div class="fri-logo">F.R.I.D.A.Y</div>
+      <div class="fri-sub">Voice Intelligence System</div>
+    </div>
+    <div class="status-pill">
+      <div class="status-dot" id="statusDot"></div>
+      <span id="statusLabel">Ready</span>
+    </div>
+  </div>
+
+  <!-- Orb -->
+  <div class="orb-wrap">
+    <div class="ring ring-1"></div>
+    <div class="ring ring-2"></div>
+    <div class="ring ring-3"></div>
+    <div class="orb-core" id="orbCore">
+      <div class="orb-icon" id="orbIcon">⚡</div>
+    </div>
+    <div class="wave-bars" id="waveBars">
+      <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+      <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+      <div class="bar"></div>
+    </div>
+  </div>
+
+  <!-- State text -->
+  <div class="state-text" id="stateText">Tap mic to speak</div>
+
+  <!-- Transcript -->
+  <div class="transcript-wrap">
+    <div class="transcript-label">Live Transcript</div>
+    <div id="transcript">
+      <div class="transcript-text fri-text">Namaste, Suho! Main Friday hoon — tera voice assistant. Mic tap kar aur bol kuch bhi. Main sun raha hoon. ⚡</div>
+    </div>
+  </div>
+
+  <!-- Voice selector -->
+  <div class="voice-row">
+    <span class="voice-label">Voice</span>
+    <select id="voiceSelect"></select>
+  </div>
+
+  <!-- Speed -->
+  <div class="speed-row">
+    <span class="voice-label">Speed</span>
+    <input type="range" id="speedRange" min="0.6" max="1.6" step="0.1" value="0.95">
+    <span class="voice-label" id="speedVal">0.95x</span>
+  </div>
+
+  <!-- Controls -->
+  <div class="controls">
+    <button class="side-btn" id="stopBtn" title="Stop speaking" onclick="stopSpeaking()">⏹</button>
+    <button class="mic-btn" id="micBtn" onclick="toggleMic()">🎤</button>
+    <button class="side-btn" id="clearBtn" title="Clear" onclick="clearTranscript()">🗑</button>
+  </div>
+
+  <div class="hint" id="hintText">Tap 🎤 · Bol kuch bhi · Friday sunegaa</div>
+
+</div>
+
+<script>
+// ══════════════════════════════════════════════
+//  CONFIG
+// ══════════════════════════════════════════════
+const SYSTEM_PROMPT = `Tu Friday hai — ek highly intelligent, sharp AI voice assistant jo Suho ke liye kaam karta hai. Suho ek young Delhi-based content creator aur entrepreneur hai jiska YouTube channel "Suho Sarcastic" hai.
+
+Tu Tony Stark ke Friday ki tarah kaam karta hai:
+- Smart, direct, aur confident responses de
+- Hinglish mein baat kar (Hindi + English mix, Roman script mein) — yahi Suho ka style hai
+- Voice ke liye chhote aur punchy responses de — 2-4 sentences max jab tak deep research na maange
+- Research aur analysis maange toh depth se kar
+- Thoda wit aur personality rakh — robotic mat ban
+- Suho ko "Boss" ya "Suho" bulaaye
+- Response mein emojis mat use kar (voice ke liye)
+- Natural bolne waali language use kar`;
+
+// ══════════════════════════════════════════════
+//  STATE
+// ══════════════════════════════════════════════
+let recognition = null;
+let synth = window.speechSynthesis;
+let voices = [];
+let isListening = false;
+let isSpeaking = false;
+let conversationHistory = [];
+let currentUtterance = null;
+
+// ══════════════════════════════════════════════
+//  DOM
+// ══════════════════════════════════════════════
+const orbCore   = document.getElementById('orbCore');
+const orbIcon   = document.getElementById('orbIcon');
+const stateText = document.getElementById('stateText');
+const micBtn    = document.getElementById('micBtn');
+const waveBars  = document.getElementById('waveBars');
+const transcript = document.getElementById('transcript');
+const voiceSelect = document.getElementById('voiceSelect');
+const statusDot  = document.getElementById('statusDot');
+const statusLabel= document.getElementById('statusLabel');
+const speedRange = document.getElementById('speedRange');
+const speedVal   = document.getElementById('speedVal');
+
+// ══════════════════════════════════════════════
+//  VOICES SETUP
+// ══════════════════════════════════════════════
+function loadVoices() {
+  voices = synth.getVoices();
+  voiceSelect.innerHTML = '';
+
+  // Prefer natural-sounding English voices
+  const preferred = voices.filter(v =>
+    v.lang.startsWith('en') &&
+    (v.name.includes('Google') || v.name.includes('Natural') ||
+     v.name.includes('Neural') || v.name.includes('Premium') ||
+     v.name.includes('Enhanced') || v.name.includes('Samantha') ||
+     v.name.includes('Alex') || v.name.includes('Daniel'))
+  );
+
+  const others = voices.filter(v => v.lang.startsWith('en') && !preferred.includes(v));
+  const allEn  = [...preferred, ...others];
+  const rest   = voices.filter(v => !v.lang.startsWith('en'));
+  const sorted = [...allEn, ...rest];
+
+  sorted.forEach((v, i) => {
+    const opt = document.createElement('option');
+    opt.value = i;
+    opt.textContent = `${v.name} (${v.lang})`;
+    if (v.name.includes('Google') && v.lang === 'en-US') opt.selected = true;
+    voiceSelect.appendChild(opt);
+  });
+}
+
+loadVoices();
+if (speechSynthesis.onvoiceschanged !== undefined) {
+  speechSynthesis.onvoiceschanged = loadVoices;
+}
+
+speedRange.addEventListener('input', () => {
+  speedVal.textContent = parseFloat(speedRange.value).toFixed(2) + 'x';
+});
+
+// ══════════════════════════════════════════════
+//  SPEECH RECOGNITION SETUP
+// ══════════════════════════════════════════════
+function setupRecognition() {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) {
+    alert('Bhai, tera browser Speech Recognition support nahi karta. Chrome use kar!');
+    return false;
+  }
+
+  recognition = new SpeechRecognition();
+  recognition.lang = 'hi-IN'; // Hindi-English works best
+  recognition.continuous = false;
+  recognition.interimResults = true;
+  recognition.maxAlternatives = 1;
+
+  recognition.onstart = () => {
+    isListening = true;
+    setState('listening');
+    addTranscript('user-start', '');
+  };
+
+  recognition.onresult = (e) => {
+    let interim = '';
+    let final = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      if (e.results[i].isFinal) final += e.results[i][0].transcript;
+      else interim += e.results[i][0].transcript;
+    }
+    updateLastUserTranscript(final || interim, !!final);
+    if (final) {
+      stopListening();
+      processUserInput(final.trim());
+    }
+  };
+
+  recognition.onerror = (e) => {
+    stopListening();
+    if (e.error !== 'no-speech') {
+      setIdle();
+      addTranscriptMsg('fri-text', `System error: ${e.error}. Dobara try kar, Boss.`);
+    } else {
+      setIdle();
+    }
+  };
+
+  recognition.onend = () => {
+    if (isListening) stopListening();
+  };
+
+  return true;
+}
+
+// ══════════════════════════════════════════════
+//  MIC TOGGLE
+// ══════════════════════════════════════════════
+function toggleMic() {
+  if (isSpeaking) { stopSpeaking(); return; }
+  if (isListening) { stopListening(); return; }
+
+  if (!recognition) {
+    if (!setupRecognition()) return;
+  }
+
+  // Try to start
+  try {
+    recognition.lang = 'hi-IN';
+    recognition.start();
+    micBtn.classList.add('active');
+  } catch(e) {
+    console.error(e);
+  }
+}
+
+function stopListening() {
+  isListening = false;
+  micBtn.classList.remove('active');
+  if (recognition) {
+    try { recognition.stop(); } catch(e) {}
+  }
+  setIdle();
+}
+
+// ══════════════════════════════════════════════
+//  PROCESS INPUT → CLAUDE API
+// ══════════════════════════════════════════════
+async function processUserInput(text) {
+  if (!text) return;
+
+  conversationHistory.push({ role: 'user', content: text });
+  setState('thinking');
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        system: SYSTEM_PROMPT,
+        messages: conversationHistory
+      })
+    });
+
+    const data = await res.json();
+
+    if (data.content && data.content[0]) {
+      const reply = data.content[0].text;
+      conversationHistory.push({ role: 'assistant', content: reply });
+      addTranscriptMsg('fri-text', reply);
+      speak(reply);
+    } else {
+      const err = 'System error, Boss. Dobara try kar.';
+      addTranscriptMsg('fri-text', err);
+      speak(err);
+    }
+  } catch(e) {
+    const err = 'Network lost, Boss. Connection check kar.';
+    addTranscriptMsg('fri-text', err);
+    speak(err);
+  }
+}
+
+// ══════════════════════════════════════════════
+//  SPEECH SYNTHESIS
+// ══════════════════════════════════════════════
+function speak(text) {
+  if (!synth) return;
+  synth.cancel();
+
+  // Clean text for speaking (remove markdown)
+  const clean = text
+    .replace(/\*\*(.*?)\*\*/g, '$1')
+    .replace(/\*(.*?)\*/g, '$1')
+    .replace(/#{1,6}\s/g, '')
+    .replace(/`(.*?)`/g, '$1')
+    .replace(/\n+/g, '. ');
+
+  currentUtterance = new SpeechSynthesisUtterance(clean);
+
+  // Set voice
+  const selectedIdx = parseInt(voiceSelect.value);
+  if (!isNaN(selectedIdx) && voices[selectedIdx]) {
+    currentUtterance.voice = voices[selectedIdx];
+  }
+
+  currentUtterance.rate  = parseFloat(speedRange.value);
+  currentUtterance.pitch = 1.0;
+  currentUtterance.volume = 1.0;
+
+  currentUtterance.onstart = () => {
+    isSpeaking = true;
+    setState('speaking');
+  };
+
+  currentUtterance.onend = () => {
+    isSpeaking = false;
+    setIdle();
+  };
+
+  currentUtterance.onerror = () => {
+    isSpeaking = false;
+    setIdle();
+  };
+
+  synth.speak(currentUtterance);
+}
+
+function stopSpeaking() {
+  synth.cancel();
+  isSpeaking = false;
+  setIdle();
+}
+
+// ══════════════════════════════════════════════
+//  UI STATE
+// ══════════════════════════════════════════════
+function setState(state) {
+  orbCore.className = 'orb-core ' + state;
+  stateText.className = 'state-text ' + state;
+  waveBars.className = 'wave-bars' + (state === 'listening' ? ' active' : '');
+
+  const states = {
+    listening: { icon: '👂', text: 'Sun raha hoon...', dot: '#00ff88', label: 'Listening' },
+    thinking:  { icon: '🧠', text: 'Processing...', dot: '#ffaa00', label: 'Thinking' },
+    speaking:  { icon: '🔊', text: 'Bol raha hoon...', dot: '#00ccff', label: 'Speaking' },
+  };
+
+  const s = states[state];
+  if (s) {
+    orbIcon.textContent = s.icon;
+    stateText.textContent = s.text;
+    statusDot.style.background = s.dot;
+    statusDot.style.boxShadow = `0 0 8px ${s.dot}`;
+    statusLabel.textContent = s.label;
+  }
+}
+
+function setIdle() {
+  orbCore.className = 'orb-core';
+  stateText.className = 'state-text';
+  stateText.textContent = 'Tap mic to speak';
+  waveBars.className = 'wave-bars';
+  orbIcon.textContent = '⚡';
+  statusDot.style.background = '#00ff88';
+  statusDot.style.boxShadow = '0 0 8px #00ff88';
+  statusLabel.textContent = 'Ready';
+  micBtn.classList.remove('active');
+}
+
+// ══════════════════════════════════════════════
+//  TRANSCRIPT HELPERS
+// ══════════════════════════════════════════════
+let lastUserEl = null;
+
+function addTranscript(type, text) {
+  const div = document.createElement('div');
+  div.className = 'transcript-text user-text';
+  div.textContent = text ? `You: ${text}` : 'You: ';
+  if (type === 'user-start') {
+    lastUserEl = div;
+    const cursor = document.createElement('span');
+    cursor.className = 'cursor';
+    cursor.id = 'liveCursor';
+    div.appendChild(cursor);
+  }
+  transcript.appendChild(div);
+  transcript.parentElement.scrollTop = transcript.parentElement.scrollHeight;
+}
+
+function updateLastUserTranscript(text, isFinal) {
+  if (!lastUserEl) return;
+  const cursor = lastUserEl.querySelector('.cursor');
+  lastUserEl.textContent = `You: ${text}`;
+  if (!isFinal && cursor) lastUserEl.appendChild(cursor);
+}
+
+function addTranscriptMsg(cls, text) {
+  const div = document.createElement('div');
+  div.className = `transcript-text ${cls}`;
+  div.textContent = cls.includes('fri') ? `Friday: ${text}` : text;
+  transcript.appendChild(div);
+  const wrap = transcript.parentElement;
+  wrap.scrollTop = wrap.scrollHeight;
+  lastUserEl = null;
+}
+
+function clearTranscript() {
+  transcript.innerHTML = '<div class="transcript-text fri-text">Friday: Memory cleared, Boss. Fresh start! ⚡</div>';
+  conversationHistory = [];
+  speak('Memory cleared, Boss. Fresh start!');
+}
+
+// ══════════════════════════════════════════════
+//  KEYBOARD SHORTCUT — Space bar to talk
+// ══════════════════════════════════════════════
+document.addEventListener('keydown', (e) => {
+  if (e.code === 'Space' && e.target.tagName !== 'INPUT' && e.target.tagName !== 'SELECT') {
+    e.preventDefault();
+    toggleMic();
+  }
+});
+</script>
+</body>
+</html>
