@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>F.R.I.D.A.Y — Voice Assistant</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --blue: #00ccff;
+    --blue2: #0066ff;
+    --glow: rgba(0,200,255,0.4);
+    --bg: #00040e;
+    --border: rgba(0,200,255,0.18);
+    --text: rgba(180,230,255,0.92);
+    --dim: rgba(80,160,210,0.55);
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: var(--bg);
+    min-height: 100vh;
+    font-family: 'Rajdhani', sans-serif;
+    color: var(--text);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+
+  /* BG */
+  .bg-wrap { position:fixed; inset:0; z-index:0; overflow:hidden; }
+  .bg-grid {
+    position:absolute; inset:0;
+    background-image:
+      linear-gradient(rgba(0,180,255,0.035) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,180,255,0.035) 1px, transparent 1px);
+    background-size:50px 50px;
+    animation: grid-move 25s linear infinite;
+  }
+  @keyframes grid-move { to { background-position:50px 50px; } }
+  .bg-orb {
+    position:absolute; width:800px; height:800px;
+    bottom:-350px; left:50%; transform:translateX(-50%);
+    background:radial-gradient(circle, rgba(0,80,200,0.18) 0%, transparent 65%);
+    filter:blur(60px);
+    animation: breathe 6s ease-in-out infinite;
+  }
+  @keyframes breathe {
+    0%,100%{opacity:0.7;} 50%{opacity:1;}
+  }
+  .scanline {
+    position:fixed; left:0; right:0; height:1px; z-index:30;
+    background:linear-gradient(90deg, transparent, rgba(0,200,255,0.3), transparent);
+    animation: scan 8s linear infinite;
+  }
+  @keyframes scan { from{top:0;} to{top:100vh;} }
+  .corner { position:fixed; width:45px; height:45px; z-index:5; opacity:0.35; }
+  .c-tl{top:10px;left:10px;border-top:1px solid var(--blue);border-left:1px solid var(--blue);}
+  .c-tr{top:10px;right:10px;border-top:1px solid var(--blue);border-right:1px solid var(--blue);}
+  .c-bl{bottom:10px;left:10px;border-bottom:1px solid var(--blue);border-left:1px solid var(--blue);}
+  .c-br{bottom:10px;right:10px;border-bottom:1px solid var(--blue);border-right:1px solid var(--blue);}
+
+  /* KEY SETUP SCREEN */
+  #keySetup {
+    position:relative; z-index:10;
+    width:min(420px,93vw);
+    background:rgba(0,10,30,0.85);
+    border:1px solid var(--border);
+    border-radius:22px;
+    backdrop-filter:blur(30px);
+    padding:32px 26px;
+    display:none;
+    flex-direction:column;
+    align-items:center;
+    gap:20px;
+    box-shadow:0 40px 100px rgba(0,0,0,0.7), 0 0 60px rgba(0,100,200,0.1);
+  }
+  .setup-icon { font-size:40px; filter:drop-shadow(0 0 12px var(--blue)); }
+  .setup-title {
+    font-family:'Orbitron',monospace;
+    font-size:16px; font-weight:900;
+    letter-spacing:4px; color:var(--blue);
+    text-shadow:0 0 15px var(--glow);
+    text-align:center;
+  }
+  .setup-desc {
+    font-size:13px; line-height:1.7;
+    color:var(--dim); text-align:center;
+    letter-spacing:0.3px;
+  }
+  .setup-steps {
+    width:100%;
+    background:rgba(0,20,60,0.5);
+    border:1px solid var(--border);
+    border-radius:12px;
+    padding:16px;
+    display:flex; flex-direction:column; gap:10px;
+  }
+  .step {
+    display:flex; align-items:flex-start; gap:10px;
+    font-size:12px; line-height:1.6; color:var(--text);
+  }
+  .step-num {
+    min-width:22px; height:22px;
+    background:rgba(0,150,255,0.2);
+    border:1px solid rgba(0,200,255,0.3);
+    border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    font-family:'Orbitron',monospace;
+    font-size:9px; font-weight:700; color:var(--blue);
+  }
+  .key-input-wrap {
+    width:100%;
+    background:rgba(0,15,45,0.7);
+    border:1px solid var(--border);
+    border-radius:12px;
+    padding:4px 8px 4px 16px;
+    display:flex; align-items:center; gap:8px;
+    transition:border-color 0.2s;
+  }
+  .key-input-wrap:focus-within {
+    border-color:rgba(0,200,255,0.5);
+    box-shadow:0 0 20px rgba(0,150,255,0.1);
+  }
+  #keyInput {
+    flex:1; background:transparent; border:none; outline:none;
+    color:var(--text); font-family:'Rajdhani',sans-serif;
+    font-size:13px; letter-spacing:0.5px; padding:12px 0;
+  }
+  #keyInput::placeholder { color:var(--dim); }
+  .eye-btn {
+    background:none; border:none; cursor:pointer;
+    font-size:16px; padding:4px; opacity:0.6;
+    transition:opacity 0.2s;
+  }
+  .eye-btn:hover { opacity:1; }
+  .key-error {
+    font-size:11px; color:#ff4466;
+    letter-spacing:0.5px; min-height:16px;
+    text-align:center;
+  }
+  .activate-btn {
+    width:100%;
+    background:linear-gradient(135deg, #0066ff, #0033aa);
+    border:none; border-radius:12px;
+    color:#fff; font-family:'Orbitron',monospace;
+    font-size:12px; letter-spacing:3px;
+    padding:14px; cursor:pointer;
+    box-shadow:0 0 20px rgba(0,100,255,0.3);
+    transition:all 0.2s ease;
+  }
+  .activate-btn:hover {
+    transform:translateY(-1px);
+    box-shadow:0 0 30px rgba(0,100,255,0.5);
+  }
+  .groq-link {
+    font-size:11px; letter-spacing:1px; color:var(--blue);
+    text-decoration:none; opacity:0.7;
+    transition:opacity 0.2s;
+  }
+  .groq-link:hover { opacity:1; }
+
+  /* MAIN CARD */
+  #mainCard {
+    position:relative; z-index:10;
+    width:min(440px,93vw);
+    background:rgba(0,10,30,0.78);
+    border:1px solid var(--border);
+    border-radius:22px;
+    backdrop-filter:blur(30px);
+    box-shadow:0 40px 100px rgba(0,0,0,0.7), 0 0 50px rgba(0,100,200,0.1);
+    padding:26px 22px 22px;
+    display:none;
+    flex-direction:column;
+    align-items:center;
+    gap:22px;
+  }
+
+  /* Top bar */
+  .top-bar { width:100%; display:flex; align-items:center; justify-content:space-between; }
+  .fri-logo {
+    font-family:'Orbitron',monospace; font-size:15px; font-weight:900;
+    letter-spacing:4px; color:var(--blue); text-shadow:0 0 12px var(--glow);
+  }
+  .fri-sub { font-size:8px; letter-spacing:2.5px; color:var(--dim); text-transform:uppercase; margin-top:2px; }
+  .status-pill {
+    display:flex; align-items:center; gap:6px;
+    background:rgba(0,200,255,0.06);
+    border:1px solid rgba(0,200,255,0.12);
+    border-radius:100px; padding:5px 12px;
+    font-size:9px; letter-spacing:2px; color:var(--dim); text-transform:uppercase;
+  }
+  .sdot {
+    width:6px; height:6px; border-radius:50%;
+    background:#00ff88; box-shadow:0 0 8px #00ff88;
+    animation:blink 2s ease-in-out infinite;
+  }
+  @keyframes blink { 0%,100%{opacity:1;} 50%{opacity:0.2;} }
+
+  /* ORB */
+  .orb-wrap {
+    position:relative; width:180px; height:180px;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .ring {
+    position:absolute; border-radius:50%;
+    border:1px solid rgba(0,200,255,0.12);
+    animation:ring-rotate linear infinite;
+  }
+  .r1{width:180px;height:180px;animation-duration:15s;border-top-color:rgba(0,200,255,0.45);}
+  .r2{width:150px;height:150px;animation-duration:10s;animation-direction:reverse;border-right-color:rgba(0,150,255,0.35);}
+  .r3{width:122px;height:122px;animation-duration:20s;border-bottom-color:rgba(0,100,255,0.25);}
+  @keyframes ring-rotate { to{transform:rotate(360deg);} }
+  .orb-core {
+    width:88px; height:88px; border-radius:50%;
+    background:radial-gradient(circle at 35% 35%, rgba(0,200,255,0.25) 0%, rgba(0,100,200,0.15) 40%, rgba(0,20,80,0.85) 100%);
+    border:1px solid rgba(0,200,255,0.35);
+    box-shadow:0 0 25px rgba(0,150,255,0.35), 0 0 50px rgba(0,80,200,0.15), inset 0 0 18px rgba(0,150,255,0.12);
+    display:flex; align-items:center; justify-content:center;
+    font-size:26px; transition:all 0.3s ease;
+    filter:drop-shadow(0 0 8px var(--blue));
+  }
+  .orb-core.listening {
+    box-shadow:0 0 35px rgba(0,255,150,0.5), 0 0 70px rgba(0,200,100,0.25), inset 0 0 25px rgba(0,255,150,0.18);
+    border-color:rgba(0,255,150,0.55);
+    animation:listen-pulse 0.8s ease-in-out infinite;
+  }
+  .orb-core.speaking {
+    animation:speak-pulse 0.45s ease-in-out infinite;
+    box-shadow:0 0 40px rgba(0,200,255,0.7), 0 0 80px rgba(0,100,255,0.35), inset 0 0 25px rgba(0,200,255,0.25);
+  }
+  .orb-core.thinking {
+    animation:think-rotate 1s linear infinite;
+    border-color:rgba(255,180,0,0.5);
+    box-shadow:0 0 35px rgba(255,150,0,0.35), inset 0 0 18px rgba(255,150,0,0.12);
+  }
+  @keyframes listen-pulse { 0%,100%{transform:scale(1);} 50%{transform:scale(1.09);} }
+  @keyframes speak-pulse { 0%,100%{transform:scale(1);} 50%{transform:scale(1.06);} }
+  @keyframes think-rotate { to{transform:rotate(360deg);} }
+
+  /* Wave bars */
+  .wave-bars {
+    position:absolute; bottom:-26px;
+    display:flex; gap:4px; align-items:flex-end;
+    height:22px; opacity:0; transition:opacity 0.3s;
+  }
+  .wave-bars.active { opacity:1; }
+  .bar {
+    width:3px; border-radius:3px; min-height:4px;
+    background:linear-gradient(to top, var(--blue2), var(--blue));
+    box-shadow:0 0 5px var(--glow);
+    animation:wave 0.5s ease-in-out infinite;
+  }
+  .bar:nth-child(1){animation-delay:0s;animation-duration:0.45s;}
+  .bar:nth-child(2){animation-delay:0.1s;animation-duration:0.55s;}
+  .bar:nth-child(3){animation-delay:0.05s;animation-duration:0.4s;}
+  .bar:nth-child(4){animation-delay:0.15s;animation-duration:0.6s;}
+  .bar:nth-child(5){animation-delay:0.08s;animation-duration:0.5s;}
+  .bar:nth-child(6){animation-delay:0.2s;animation-duration:0.45s;}
+  .bar:nth-child(7){animation-delay:0.12s;animation-duration:0.55s;}
+  @keyframes wave { 0%,100%{height:4px;} 50%{height:20px;} }
+
+  /* State text */
+  .state-text {
+    font-family:'Orbitron',monospace; font-size:10px;
+    letter-spacing:3px; text-transform:uppercase;
+    color:var(--dim); text-align:center; min-height:16px;
+    transition:all 0.3s;
+  }
+  .state-text.listening{color:#00ff88;text-shadow:0 0 10px rgba(0,255,136,0.5);}
+  .state-text.speaking{color:var(--blue);text-shadow:0 0 10px var(--glow);}
+  .state-text.thinking{color:#ffaa00;text-shadow:0 0 10px rgba(255,170,0,0.5);}
+
+  /* Transcript */
+  .t-wrap {
+    width:100%;
+    background:rgba(0,10,30,0.5);
+    border:1px solid var(--border);
+    border-radius:13px; padding:14px;
+    min-height:85px; max-height:150px;
+    overflow-y:auto;
+    scrollbar-width:thin; scrollbar-color:var(--border) transparent;
+  }
+  .t-label {
+    font-size:8px; letter-spacing:3px; color:var(--dim);
+    text-transform:uppercase; margin-bottom:8px;
+    font-family:'Orbitron',monospace;
+  }
+  .t-text { font-size:13px; line-height:1.7; color:var(--text); white-space:pre-wrap; }
+  .t-user { color:rgba(150,220,255,0.85); }
+  .t-fri {
+    color:rgba(100,200,255,0.95);
+    border-left:2px solid var(--blue);
+    padding-left:10px; margin-top:8px;
+  }
+  .cursor {
+    display:inline-block; width:2px; height:13px;
+    background:var(--blue); margin-left:2px;
+    animation:cur 0.7s ease-in-out infinite; vertical-align:middle;
+  }
+  @keyframes cur { 0%,100%{opacity:1;} 50%{opacity:0;} }
+
+  /* Voice + Speed */
+  .ctrl-row {
+    width:100%; display:flex; align-items:center; gap:10px;
+  }
+  .ctrl-label {
+    font-size:8px; letter-spacing:2.5px; color:var(--dim);
+    text-transform:uppercase; font-family:'Orbitron',monospace;
+    white-space:nowrap;
+  }
+  select {
+    flex:1; background:rgba(0,15,40,0.7);
+    border:1px solid var(--border); border-radius:8px;
+    color:var(--text); font-family:'Rajdhani',sans-serif;
+    font-size:12px; padding:6px 10px; outline:none; cursor:pointer;
+  }
+  input[type=range] {
+    flex:1; height:3px; -webkit-appearance:none;
+    background:linear-gradient(90deg, var(--blue2), var(--blue));
+    border-radius:2px; outline:none; cursor:pointer;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance:none; width:12px; height:12px;
+    border-radius:50%; background:var(--blue);
+    box-shadow:0 0 8px var(--glow);
+  }
+
+  /* Buttons */
+  .btns { display:flex; gap:14px; align-items:center; }
+  .mic-btn {
+    width:68px; height:68px; border-radius:50%;
+    background:linear-gradient(135deg, rgba(0,100,220,0.3), rgba(0,40,120,0.5));
+    border:1.5px solid rgba(0,200,255,0.3);
+    cursor:pointer; display:flex; align-items:center; justify-content:center;
+    font-size:24px; transition:all 0.25s;
+    box-shadow:0 0 18px rgba(0,100,200,0.2);
+  }
+  .mic-btn:hover { transform:scale(1.07); box-shadow:0 0 28px rgba(0,150,255,0.4); }
+  .mic-btn.active {
+    background:linear-gradient(135deg, rgba(0,200,100,0.3), rgba(0,100,60,0.5));
+    border-color:rgba(0,255,150,0.5);
+    animation:mic-ring 1s ease-in-out infinite;
+  }
+  @keyframes mic-ring {
+    0%,100%{box-shadow:0 0 28px rgba(0,255,150,0.3);}
+    50%{box-shadow:0 0 45px rgba(0,255,150,0.6), 0 0 0 8px rgba(0,255,150,0.07);}
+  }
+  .side-btn {
+    width:44px; height:44px; border-radius:50%;
+    background:rgba(0,20,60,0.6);
+    border:1px solid var(--border); cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+    font-size:17px; transition:all 0.2s;
+  }
+  .side-btn:hover { background:rgba(0,50,120,0.4); border-color:rgba(0,200,255,0.4); transform:scale(1.05); }
+  .hint { font-size:9px; letter-spacing:2px; color:var(--dim); text-transform:uppercase; text-align:center; }
+
+  .fade-in { animation:fadein 0.6s ease forwards; }
+  @keyframes fadein { from{opacity:0;transform:translateY(12px);} to{opacity:1;transform:translateY(0);} }
+</style>
+</head>
+<body>
+
+<div class="bg-wrap">
+  <div class="bg-grid"></div>
+  <div class="bg-orb"></div>
+</div>
+<div class="scanline"></div>
+<div class="corner c-tl"></div>
+<div class="corner c-tr"></div>
+<div class="corner c-bl"></div>
+<div class="corner c-br"></div>
+
+<!-- ══ KEY SETUP SCREEN ══ -->
+<div id="keySetup" class="fade-in">
+  <div class="setup-icon">🔑</div>
+  <div class="setup-title">SYSTEM ACTIVATION</div>
+  <p class="setup-desc">Friday ko activate karne ke liye Groq API key chahiye. Yeh free hai — neeche steps follow kar.</p>
+
+  <div class="setup-steps">
+    <div class="step">
+      <div class="step-num">1</div>
+      <div><b>console.groq.com</b> pe ja aur login kar</div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div>Left menu mein <b>API Keys</b> → <b>Create API Key</b></div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div>Key copy karke neeche paste kar (<b>gsk_...</b> se shuru hogi)</div>
+    </div>
+  </div>
+
+  <div class="key-input-wrap">
+    <input type="password" id="keyInput" placeholder="gsk_xxxxxxxxxxxxxxxx" />
+    <button class="eye-btn" onclick="toggleKeyVis()">👁</button>
+  </div>
+  <div class="key-error" id="keyError"></div>
+
+  <button class="activate-btn" onclick="saveKey()">⚡ ACTIVATE FRIDAY</button>
+  <a class="groq-link" href="https://console.groq.com" target="_blank">→ console.groq.com pe ja</a>
+</div>
+
+<!-- ══ MAIN CARD ══ -->
+<div id="mainCard" class="fade-in">
+
+  <div class="top-bar">
+    <div>
+      <div class="fri-logo">F.R.I.D.A.Y</div>
+      <div class="fri-sub">Voice Intelligence System</div>
+    </div>
+    <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;">
+      <div class="status-pill">
+        <div class="sdot" id="sdot"></div>
+        <span id="slabel">Ready</span>
+      </div>
+      <button onclick="resetKey()" style="background:none;border:none;cursor:pointer;font-size:9px;letter-spacing:1.5px;color:var(--dim);text-transform:uppercase;">⚙ Change Key</button>
+    </div>
+  </div>
+
+  <div class="orb-wrap">
+    <div class="ring r1"></div>
+    <div class="ring r2"></div>
+    <div class="ring r3"></div>
+    <div class="orb-core" id="orbCore">⚡</div>
+    <div class="wave-bars" id="waveBars">
+      <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+      <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+      <div class="bar"></div>
+    </div>
+  </div>
+
+  <div class="state-text" id="stateText">Tap mic to speak</div>
+
+  <div class="t-wrap">
+    <div class="t-label">Live Transcript</div>
+    <div id="transcript">
+      <div class="t-text t-fri">Friday: Namaste Boss! Main ready hoon. Bol kuch bhi.</div>
+    </div>
+  </div>
+
+  <div class="ctrl-row">
+    <span class="ctrl-label">Voice</span>
+    <select id="voiceSel"></select>
+  </div>
+
+  <div class="ctrl-row">
+    <span class="ctrl-label">Speed</span>
+    <input type="range" id="speedR" min="0.6" max="1.6" step="0.1" value="0.95">
+    <span class="ctrl-label" id="speedV">0.95x</span>
+  </div>
+
+  <div class="btns">
+    <button class="side-btn" onclick="stopSpeak()" title="Stop">⏹</button>
+    <button class="mic-btn" id="micBtn" onclick="toggleMic()">🎤</button>
+    <button class="side-btn" onclick="clearAll()" title="Clear">🗑</button>
+  </div>
+
+  <div class="hint">Tap 🎤 · Bol kuch bhi · Friday sunegaa · Space = shortcut</div>
+</div>
+
+<script>
+// ══ CONFIG ══
+const SYSTEM_PROMPT = `Tu Friday hai — Tony Stark ke JARVIS jaisa AI voice assistant. Suho ka personal assistant hai jo Delhi mein rehta hai aur "Suho Sarcastic" YouTube channel chalata hai.
+
+Rules:
+- Hinglish mein baat kar (Hindi + English Roman script)
+- Voice ke liye short punchy responses de — 2-3 sentences max
+- Deep research maange toh detail mein de
+- Suho ko "Boss" bulaaye
+- Emojis mat use kar — voice ke liye
+- Smart, confident, thoda witty reh`;
+
+let GROQ_KEY = localStorage.getItem('fri_groq') || '';
+let recognition = null;
+let synth = window.speechSynthesis;
+let voices = [];
+let isListening = false;
+let isSpeaking = false;
+let history = [];
+let lastUserEl = null;
+
+// ══ VOICES ══
+function loadVoices() {
+  voices = synth.getVoices();
+  const sel = document.getElementById('voiceSel');
+  sel.innerHTML = '';
+  const enVoices = voices.filter(v => v.lang.startsWith('en'));
+  const rest = voices.filter(v => !v.lang.startsWith('en'));
+  [...enVoices, ...rest].forEach((v, i) => {
+    const o = document.createElement('option');
+    o.value = i; o.textContent = `${v.name} (${v.lang})`;
+    if (v.name.includes('Google') && v.lang === 'en-US') o.selected = true;
+    sel.appendChild(o);
+  });
+}
+loadVoices();
+if (speechSynthesis.onvoiceschanged !== undefined) speechSynthesis.onvoiceschanged = loadVoices;
+
+document.getElementById('speedR').addEventListener('input', function() {
+  document.getElementById('speedV').textContent = parseFloat(this.value).toFixed(2) + 'x';
+});
+
+// ══ KEY SETUP ══
+function toggleKeyVis() {
+  const inp = document.getElementById('keyInput');
+  inp.type = inp.type === 'password' ? 'text' : 'password';
+}
+
+function saveKey() {
+  const k = document.getElementById('keyInput').value.trim();
+  const err = document.getElementById('keyError');
+  if (!k) { err.textContent = 'Key enter karo pehle!'; return; }
+  if (!k.startsWith('gsk_')) { err.textContent = 'Invalid! gsk_ se shuru hona chahiye.'; return; }
+  localStorage.setItem('fri_groq', k);
+  GROQ_KEY = k;
+  document.getElementById('keySetup').style.display = 'none';
+  document.getElementById('mainCard').style.display = 'flex';
+  setTimeout(() => speak('System online Boss. Friday ready hai.'), 500);
+}
+
+function resetKey() {
+  localStorage.removeItem('fri_groq');
+  GROQ_KEY = '';
+  document.getElementById('mainCard').style.display = 'none';
+  document.getElementById('keyInput').value = '';
+  document.getElementById('keyError').textContent = '';
+  document.getElementById('keySetup').style.display = 'flex';
+}
+
+// ══ INIT ══
+window.addEventListener('load', () => {
+  if (GROQ_KEY) {
+    document.getElementById('mainCard').style.display = 'flex';
+    setTimeout(() => speak('Welcome back Boss. Friday online hai.'), 600);
+  } else {
+    document.getElementById('keySetup').style.display = 'flex';
+  }
+});
+
+// ══ SPEECH RECOGNITION ══
+function setupRecognition() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) { alert('Chrome use karo bhai! Ye browser support nahi karta.'); return false; }
+  recognition = new SR();
+  recognition.lang = 'hi-IN';
+  recognition.continuous = false;
+  recognition.interimResults = true;
+
+  recognition.onstart = () => {
+    isListening = true; setState('listening');
+    addUserMsg('');
+  };
+
+  recognition.onresult = (e) => {
+    let interim = '', final = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      if (e.results[i].isFinal) final += e.results[i][0].transcript;
+      else interim += e.results[i][0].transcript;
+    }
+    updateUserMsg(final || interim, !!final);
+    if (final) { stopListen(); processInput(final.trim()); }
+  };
+
+  recognition.onerror = (e) => {
+    stopListen();
+    if (e.error !== 'no-speech') addFriMsg('Error: ' + e.error + '. Dobara try kar Boss.');
+    else setIdle();
+  };
+
+  recognition.onend = () => { if (isListening) stopListen(); };
+  return true;
+}
+
+function toggleMic() {
+  if (isSpeaking) { stopSpeak(); return; }
+  if (isListening) { stopListen(); return; }
+  if (!recognition && !setupRecognition()) return;
+  try { recognition.start(); document.getElementById('micBtn').classList.add('active'); } catch(e) {}
+}
+
+function stopListen() {
+  isListening = false;
+  document.getElementById('micBtn').classList.remove('active');
+  try { recognition.stop(); } catch(e) {}
+  setIdle();
+}
+
+// ══ GROQ API ══
+async function processInput(text) {
+  if (!text || !GROQ_KEY) return;
+  history.push({ role: 'user', content: text });
+  setState('thinking');
+
+  try {
+    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${GROQ_KEY}`
+      },
+      body: JSON.stringify({
+        model: 'llama-3.3-70b-versatile',
+        max_tokens: 400,
+        messages: [{ role: 'system', content: SYSTEM_PROMPT }, ...history]
+      })
+    });
+
+    const data = await res.json();
+
+    if (data.choices?.[0]) {
+      const reply = data.choices[0].message.content;
+      history.push({ role: 'assistant', content: reply });
+      addFriMsg(reply);
+      speak(reply);
+    } else if (data.error) {
+      const e = 'API error Boss. Key check kar ya naya bana.';
+      addFriMsg(e); speak(e);
+    }
+  } catch(err) {
+    const e = 'Network lost Boss. Connection check kar.';
+    addFriMsg(e); speak(e);
+  }
+}
+
+// ══ SPEECH SYNTHESIS ══
+function speak(text) {
+  synth.cancel();
+  const clean = text.replace(/\*\*(.*?)\*\*/g,'$1').replace(/#{1,6}\s/g,'').replace(/\n+/g,'. ');
+  const utt = new SpeechSynthesisUtterance(clean);
+  const idx = parseInt(document.getElementById('voiceSel').value);
+  if (!isNaN(idx) && voices[idx]) utt.voice = voices[idx];
+  utt.rate = parseFloat(document.getElementById('speedR').value);
+  utt.pitch = 1.0; utt.volume = 1.0;
+  utt.onstart = () => { isSpeaking = true; setState('speaking'); };
+  utt.onend = () => { isSpeaking = false; setIdle(); };
+  utt.onerror = () => { isSpeaking = false; setIdle(); };
+  synth.speak(utt);
+}
+
+function stopSpeak() { synth.cancel(); isSpeaking = false; setIdle(); }
+
+// ══ UI STATE ══
+function setState(s) {
+  const orb = document.getElementById('orbCore');
+  const st = document.getElementById('stateText');
+  const wb = document.getElementById('waveBars');
+  const sd = document.getElementById('sdot');
+  const sl = document.getElementById('slabel');
+
+  orb.className = 'orb-core ' + s;
+  st.className = 'state-text ' + s;
+  wb.className = 'wave-bars' + (s === 'listening' ? ' active' : '');
+
+  const map = {
+    listening: { icon:'👂', text:'Sun raha hoon...', dot:'#00ff88', label:'Listening' },
+    thinking:  { icon:'🧠', text:'Processing...', dot:'#ffaa00', label:'Thinking' },
+    speaking:  { icon:'🔊', text:'Bol raha hoon...', dot:'#00ccff', label:'Speaking' },
+  };
+
+  if (map[s]) {
+    orb.textContent = map[s].icon;
+    st.textContent = map[s].text;
+    sd.style.background = map[s].dot;
+    sd.style.boxShadow = `0 0 8px ${map[s].dot}`;
+    sl.textContent = map[s].label;
+  }
+}
+
+function setIdle() {
+  document.getElementById('orbCore').className = 'orb-core';
+  document.getElementById('orbCore').textContent = '⚡';
+  document.getElementById('stateText').className = 'state-text';
+  document.getElementById('stateText').textContent = 'Tap mic to speak';
+  document.getElementById('waveBars').className = 'wave-bars';
+  document.getElementById('micBtn').classList.remove('active');
+  document.getElementById('sdot').style.background = '#00ff88';
+  document.getElementById('sdot').style.boxShadow = '0 0 8px #00ff88';
+  document.getElementById('slabel').textContent = 'Ready';
+}
+
+// ══ TRANSCRIPT ══
+function addUserMsg(text) {
+  const d = document.createElement('div');
+  d.className = 't-text t-user';
+  d.textContent = 'You: ' + text;
+  const cur = document.createElement('span');
+  cur.className = 'cursor';
+  d.appendChild(cur);
+  lastUserEl = d;
+  document.getElementById('transcript').appendChild(d);
+  scrollT();
+}
+
+function updateUserMsg(text, final) {
+  if (!lastUserEl) return;
+  const cur = lastUserEl.querySelector('.cursor');
+  lastUserEl.textContent = 'You: ' + text;
+  if (!final && cur) lastUserEl.appendChild(cur);
+}
+
+function addFriMsg(text) {
+  const d = document.createElement('div');
+  d.className = 't-text t-fri';
+  d.textContent = 'Friday: ' + text;
+  document.getElementById('transcript').appendChild(d);
+  lastUserEl = null;
+  scrollT();
+}
+
+function scrollT() {
+  const w = document.getElementById('transcript').parentElement;
+  w.scrollTop = w.scrollHeight;
+}
+
+function clearAll() {
+  document.getElementById('transcript').innerHTML = '<div class="t-text t-fri">Friday: Memory cleared Boss. Fresh start!</div>';
+  history = [];
+  speak('Memory cleared Boss. Fresh start!');
+}
+
+// Space shortcut
+document.addEventListener('keydown', e => {
+  if (e.code === 'Space' && e.target.tagName !== 'INPUT') {
+    e.preventDefault(); toggleMic();
+  }
+});
+</script>
+</body>
+</html>
